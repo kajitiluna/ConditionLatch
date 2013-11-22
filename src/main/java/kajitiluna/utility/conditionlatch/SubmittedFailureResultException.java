@@ -6,5 +6,4 @@ package kajitiluna.utility.conditionlatch;
  */
 public class SubmittedFailureResultException extends Exception {
 
-
 }
