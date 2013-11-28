@@ -1,10 +1,10 @@
 package kajitiluna.utility.conditionlatch;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -18,15 +18,11 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
 
     private final ReadWriteLock successListLock_;
 
-    private final ReadWriteLock failedListLock_;
-
-    private final AtomicInteger successTaskCount_;
-
-    private final AtomicInteger failedTaskCount_;
+    private final ReadWriteLock failureListLock_;
 
     private final List<SUCCESS_RESULT> successList_;
 
-    private final List<FAILED_RESULT> failedList_;
+    private final List<FAILED_RESULT> failureList_;
 
     private final UnionSynchronizer synchronizer_;
 
@@ -44,12 +40,10 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         }
 
         this.successListLock_ = new ReentrantReadWriteLock();
-        this.successTaskCount_ = new AtomicInteger(0);
         this.successList_ = new ArrayList<SUCCESS_RESULT>(succseccCount + 1);
 
-        this.failedListLock_ = new ReentrantReadWriteLock();
-        this.failedTaskCount_ = new AtomicInteger(0);
-        this.failedList_ = new ArrayList<FAILED_RESULT>(failedCount + 1);
+        this.failureListLock_ = new ReentrantReadWriteLock();
+        this.failureList_ = new ArrayList<FAILED_RESULT>(failedCount + 1);
 
         this.synchronizer_ = new UnionSynchronizer(succseccCount, failedCount);
     }
@@ -59,45 +53,68 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         lock.lock();
         try {
             this.successList_.add(result);
-            this.successTaskCount_.addAndGet(1);
-        }
-        finally {
+        } finally {
             lock.unlock();
         }
 
-        // TODO
+        this.synchronizer_.releaseShared(1);
     }
 
     public void submitForFail(FAILED_RESULT resut) {
-        Lock lock = this.failedListLock_.writeLock();
+        Lock lock = this.failureListLock_.writeLock();
         lock.lock();
         try {
-            this.failedList_.add(resut);
-            this.failedTaskCount_.addAndGet(1);
-        }
-        finally {
+            this.failureList_.add(resut);
+        } finally {
             lock.unlock();
         }
 
-        // TODO
-    }
-
-    public void interrupt() {
-        // TODO
+        this.synchronizer_.releaseShared(-1);
     }
 
     public List<SUCCESS_RESULT> await() throws SubmittedFailureResultException, InterruptedException {
+        this.synchronizer_.acquireSharedInterruptibly(1);
 
-        // TODO
-
-        return null;
+        return this.returnResult();
     }
 
     public List<SUCCESS_RESULT> await(long timeout, TimeUnit timeUnit) throws SubmittedFailureResultException,
             TimeoutException, InterruptedException {
-        // TODO
+        this.synchronizer_.tryAcquireSharedNanos(1, timeUnit.toNanos(timeout));
 
-        return null;
+        return this.returnResult();
     }
 
+    private List<SUCCESS_RESULT> returnResult() throws SubmittedFailureResultException {
+        int successCount = this.synchronizer_.getSuccessCount();
+
+        if (successCount > 0) {
+            throw new SubmittedFailureResultException("Failed procedure.");
+        }
+
+        List<SUCCESS_RESULT> successList = this.copyList(this.successList_, this.successListLock_);
+
+        return successList;
+    }
+
+    private <TYPE> List<TYPE> copyList(List<TYPE> srcList, ReadWriteLock baseLock) {
+        List<TYPE> copyList;
+
+        Lock lock = baseLock.readLock();
+        try {
+            copyList = Collections.unmodifiableList(new ArrayList<TYPE>(srcList));
+        } finally {
+            lock.unlock();
+        }
+
+        return copyList;
+    }
+
+    public List<SUCCESS_RESULT> getSuccessList() {
+        return this.copyList(this.successList_, this.successListLock_);
+    }
+
+    public List<FAILED_RESULT> getFailureList() {
+        return this.copyList(this.failureList_, this.failureListLock_);
+    }
 }
