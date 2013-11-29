@@ -10,11 +10,33 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
+ * A synchronization aid that allows one or more threads to wait
+ * until a set of operations being performed in other threads completes successful or alternatively failed.
+ *
+ * <p>
+ * A {@code ConditionLatch} has the feature similar to alternative {@code CountDownLatch}.
+ * A {@code ConditionLatch} is initialized with two given parameters : <em>success count</em> and <em>failure count</em>.
+ * The {@link #await await} methods block until either <em>success count</em> or <em>failure count</em> reaches zero.
+ * These counts are decreased by the invocation of each {@link #submit} or {@link #submitForFail} methods.
+ * When the either count reached to zero, all waiting threads are released and any subsequent invocations of
+ * {@link #await await} method returns immediately.
+ * These counts cannot be reset like a {@code CountDownLatch}.
+ * </p>
+ *
+ * <p>
+ * When <em>success count</em> reaches to zero, {@link #await} method returns a list of submitted objects
+ * in {@link #submit} method's argument.
+ * On the other, when <em>failure count</em> reaches to zero,
+ * {@link #await} method returns a {@code SubmittedFailureResultException}.
+ * Thus, these responses of {@link #await} method can control the subsequences of this method.
+ * </p>
  *
  * @author kajitiluna
  *
+ * @param <SUCCESS_RESULT>
+ * @param <FAILURE_RESULT>
  */
-public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
+public class ConditionLatch<SUCCESS_RESULT, FAILURE_RESULT> {
 
     private final ReadWriteLock successListLock_;
 
@@ -22,7 +44,7 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
 
     private final List<SUCCESS_RESULT> successList_;
 
-    private final List<FAILED_RESULT> failureList_;
+    private final List<FAILURE_RESULT> failureList_;
 
     private final UnionSynchronizer synchronizer_;
 
@@ -60,7 +82,7 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         this.synchronizer_.releaseShared(1);
     }
 
-    public void submitForFail(FAILED_RESULT resut) {
+    public void submitForFail(FAILURE_RESULT resut) {
         Lock lock = this.failureListLock_.writeLock();
         lock.lock();
         try {
@@ -119,7 +141,7 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         return this.copyList(this.successList_, this.successListLock_);
     }
 
-    public final List<FAILED_RESULT> getFailureList() {
+    public final List<FAILURE_RESULT> getFailureList() {
         return this.copyList(this.failureList_, this.failureListLock_);
     }
 }
