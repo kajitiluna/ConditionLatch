@@ -47,16 +47,6 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
         return status;
     }
 
-    public int getSuccessCount() {
-        int success = this.getState() & 0x0000FFFF;
-        return success;
-    }
-
-    public int getFailureCount() {
-        int failure = (this.getState() & 0xFFFF0000) >>> 16;
-        return failure;
-    }
-
     public boolean releaseSharedInSuccess() {
         return this.releaseShared(1);
     }
@@ -68,14 +58,13 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
     @Override
     protected boolean tryReleaseShared(int releases) {
         while (true) {
-            int successCount = this.getSuccessCount();
-            int failureCount = this.getFailureCount();
+            int nowState = this.getState();
+            int successCount = nowState & 0x0000FFFF;
+            int failureCount = (nowState & 0xFFFF0000) >>> 16;
 
             if ((successCount <= 0) || (failureCount <= 0)) {
                 return false;
             }
-
-            int nowState = this.getState();
 
             int nextCount;
             int nextState;
@@ -97,8 +86,9 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
 
     @Override
     protected int tryAcquireShared(int acquires) {
-        int successCount = this.getSuccessCount();
-        int failureCount = this.getFailureCount();
+        int nowState = this.getState();
+        int successCount = nowState & 0x0000FFFF;
+        int failureCount = (nowState & 0xFFFF0000) >>> 16;
 
         int result = -1;
         if ((successCount == 0) || (failureCount == 0)) {
@@ -106,5 +96,15 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
         }
 
         return result;
+    }
+
+    public int getSuccessCount() {
+        int success = this.getState() & 0x0000FFFF;
+        return success;
+    }
+
+    public int getFailureCount() {
+        int failure = (this.getState() & 0xFFFF0000) >>> 16;
+        return failure;
     }
 }

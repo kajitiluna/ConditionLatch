@@ -26,26 +26,22 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
 
     private final UnionSynchronizer synchronizer_;
 
-    public ConditionLatch(int succseccCount) {
+    public ConditionLatch(int succseccCount) throws IllegalArgumentException {
         this(succseccCount, 1);
     }
 
-    public ConditionLatch(int succseccCount, int failedCount) {
-        if (succseccCount < 0) {
-            throw new IllegalArgumentException("succseccCount < 0");
-        }
-
-        if (failedCount < 0) {
-            throw new IllegalArgumentException("failedCount < 0");
-        }
+    public ConditionLatch(int succseccCount, int failedCount) throws IllegalArgumentException {
+        this.synchronizer_ = new UnionSynchronizer(succseccCount, failedCount);
 
         this.successListLock_ = new ReentrantReadWriteLock();
-        this.successList_ = new ArrayList<SUCCESS_RESULT>(succseccCount + 1);
+        this.successList_ = this.createList(succseccCount + 1);
 
         this.failureListLock_ = new ReentrantReadWriteLock();
-        this.failureList_ = new ArrayList<FAILED_RESULT>(failedCount + 1);
+        this.failureList_ = this.createList(failedCount + 1);
+    }
 
-        this.synchronizer_ = new UnionSynchronizer(succseccCount, failedCount);
+    protected <TYPE> List<TYPE> createList(int capacity) {
+        return new ArrayList<TYPE>(capacity);
     }
 
     public void submit(SUCCESS_RESULT result) {
@@ -57,6 +53,10 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
             lock.unlock();
         }
 
+        this.submit();
+    }
+
+    public final void submit() {
         this.synchronizer_.releaseShared(1);
     }
 
@@ -69,6 +69,10 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
             lock.unlock();
         }
 
+        this.submitForFail();
+    }
+
+    public final void submitForFail() {
         this.synchronizer_.releaseShared(-1);
     }
 
@@ -101,6 +105,7 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         List<TYPE> copyList;
 
         Lock lock = baseLock.readLock();
+        lock.lock();
         try {
             copyList = Collections.unmodifiableList(new ArrayList<TYPE>(srcList));
         } finally {
@@ -110,11 +115,11 @@ public class ConditionLatch<SUCCESS_RESULT, FAILED_RESULT> {
         return copyList;
     }
 
-    public List<SUCCESS_RESULT> getSuccessList() {
+    public final List<SUCCESS_RESULT> getSuccessList() {
         return this.copyList(this.successList_, this.successListLock_);
     }
 
-    public List<FAILED_RESULT> getFailureList() {
+    public final List<FAILED_RESULT> getFailureList() {
         return this.copyList(this.failureList_, this.failureListLock_);
     }
 }
