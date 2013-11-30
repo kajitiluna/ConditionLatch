@@ -1,6 +1,8 @@
 package kajitiluna.utility.conditionlatch;
 
 /**
+ * Exception thrown when a failed procedure is submitted.
+ *
  * @author kajitiluna
  *
  */

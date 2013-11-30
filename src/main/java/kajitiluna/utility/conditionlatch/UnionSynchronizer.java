@@ -3,6 +3,8 @@ package kajitiluna.utility.conditionlatch;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 
 /**
+ * A synchronization object for {@code ConditionLatch}.
+ *
  * @author kajitiluna
  *
  */
@@ -23,6 +25,8 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
     /**
      * Constructor.
      *
+     * @param successCount
+     * @param failureCount
      */
     public UnionSynchronizer(int successCount, int failureCount) {
         this.checkParameter(successCount, "successCount");
@@ -55,6 +59,10 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
         return this.releaseShared(-1);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     */
     @Override
     protected boolean tryReleaseShared(int releases) {
         while (true) {
@@ -84,6 +92,10 @@ class UnionSynchronizer extends AbstractQueuedSynchronizer {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     */
     @Override
     protected int tryAcquireShared(int acquires) {
         int nowState = this.getState();
