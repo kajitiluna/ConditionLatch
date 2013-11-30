@@ -1,5 +1,6 @@
 package kajitiluna.utility.conditionlatch;
 
+import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -8,6 +9,8 @@ import static org.junit.Assert.fail;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.After;
 import org.junit.Test;
@@ -162,6 +165,89 @@ public class ConditionLatchTest {
 
         List<String> failureList = target.getFailureList();
         assertTrue(failureList.size() <= 3);
+    }
+
+    @Test
+    public void testSubmit_beforeTimeout() {
+        final ConditionLatch<Object, Object> target = new ConditionLatch<Object, Object>(3);
+
+        this.executorService_ = Executors.newFixedThreadPool(4);
+        Runnable[] successTasks = TestUtil.createSuccessTasks(target, new long[] { 1000, 500, 1000 });
+        Runnable failureTask = TestUtil.createFailureTask(target, 3000);
+
+        long startTime = System.currentTimeMillis();
+        this.executorService_.submit(failureTask);
+        for (Runnable task : successTasks) {
+            this.executorService_.submit(task);
+        }
+
+        try {
+            target.await(2, TimeUnit.SECONDS);
+        } catch (SubmittedFailureResultException | InterruptedException | TimeoutException exc) {
+            fail(exc.getMessage());
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        long actualtime = endTime - startTime;
+        System.out.println("Wait time : " + actualtime);
+        assertTrue((actualtime >= 1000) && (actualtime <= 2000));
+    }
+
+    @Test
+    public void testSubmit_withTimeOver() {
+        final ConditionLatch<Object, Object> target = new ConditionLatch<Object, Object>(3);
+
+        this.executorService_ = Executors.newFixedThreadPool(4);
+        Runnable[] successTasks = TestUtil.createSuccessTasks(target, new long[] { 2000, 500, 1000 });
+        Runnable failureTask = TestUtil.createFailureTask(target, 3000);
+
+        long startTime = System.currentTimeMillis();
+        this.executorService_.submit(failureTask);
+        for (Runnable task : successTasks) {
+            this.executorService_.submit(task);
+        }
+
+        try {
+            target.await(1, TimeUnit.SECONDS);
+            fail("Unexpected success.");
+        } catch (SubmittedFailureResultException | InterruptedException exc) {
+            fail(exc.getMessage());
+        } catch (TimeoutException toExc) {
+            assertTrue(true);
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        long actualtime = endTime - startTime;
+        System.out.println("Wait time : " + actualtime);
+    }
+
+    @Test
+    public void testSubmit_beforeTimeoutOnProceessing() {
+        final ConditionLatch<Object, Object> target = new ConditionLatch<Object, Object>(2);
+
+        this.executorService_ = Executors.newFixedThreadPool(4);
+        Runnable[] successTasks = TestUtil.createSuccessTasks(target, new long[] { 3000, 500, 1000 });
+        Runnable failureTask = TestUtil.createFailureTask(target, 3000);
+
+        long startTime = System.currentTimeMillis();
+        this.executorService_.submit(failureTask);
+        for (Runnable task : successTasks) {
+            this.executorService_.submit(task);
+        }
+
+        try {
+            target.await(2, TimeUnit.SECONDS);
+        } catch (SubmittedFailureResultException | InterruptedException | TimeoutException exc) {
+            fail(exc.getMessage());
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        long actualtime = endTime - startTime;
+        System.out.println("Wait time : " + actualtime);
+        assertTrue((actualtime >= 1000) && (actualtime <= 2000));
     }
 
     @Test
@@ -357,5 +443,49 @@ public class ConditionLatchTest {
         long actualtime = endTime - startTime;
         System.out.println("Wait time : " + actualtime);
         assertTrue(actualtime >= 1000);
+    }
+
+    @Test
+    public void testTimeout_withProceessing() {
+        final ConditionLatch<String, String> target = new ConditionLatch<String, String>(3, 4);
+
+        this.executorService_ = Executors.newFixedThreadPool(8);
+        String[] successResults = { "Success Result 1", "Success Result 2", "Success Result 3" };
+        String[] failureResults = { "Failure Result 1", "Failure Result 2", "Failure Result 3" };
+        long[] waitTimes = { 500, 1000, 3000 };
+        Runnable[] successTasks = TestUtil.createSuccessTasks(target, successResults, waitTimes);
+        Runnable[] failureTasks = TestUtil.createFailureTasks(target, failureResults, waitTimes);
+
+        long startTime = System.currentTimeMillis();
+        for (int index = 0; index < successTasks.length; index++) {
+            this.executorService_.submit(successTasks[index]);
+            this.executorService_.submit(failureTasks[index]);
+        }
+
+        try {
+            target.await(2, TimeUnit.SECONDS);
+            fail("Unexpected success.");
+        } catch (SubmittedFailureResultException | InterruptedException exc) {
+            fail(exc.getMessage());
+        } catch (TimeoutException tExc) {
+            System.out.println("Occured TimeoutException : " + tExc.getMessage());
+            assertTrue(true);
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        long actualtime = endTime - startTime;
+        System.out.println("Wait time : " + actualtime);
+        assertTrue((actualtime >= 2000) && (actualtime <= 3000));
+
+        List<String> successList = target.getSuccessList();
+        List<String> failureList = target.getFailureList();
+
+        assertTrue(successList.size() == 2);
+        assertTrue(failureList.size() == 2);
+        for (int index = 0; index < 2; index++) {
+            assertThat(successList, hasItem(successResults[index]));
+            assertThat(failureList, hasItem(failureResults[index]));
+        }
     }
 }
