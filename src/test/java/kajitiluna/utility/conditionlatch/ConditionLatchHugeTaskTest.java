@@ -1,7 +1,6 @@
 package kajitiluna.utility.conditionlatch;
 
 import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -61,7 +60,7 @@ public class ConditionLatchHugeTaskTest {
         long actualtime = endTime - startTime;
         System.out.println("Wait time : " + actualtime);
 
-        assertThat(resultList.size(), is(maxCount));
+        assertTrue(resultList.size() >= maxCount);
 
         for (int index = 0; index < maxCount; index += 16) {
             assertThat(resultList, hasItem(results[index]));
@@ -138,7 +137,7 @@ public class ConditionLatchHugeTaskTest {
         System.out.println("Wait time : " + actualtime);
 
         List<String> resultList = target.getFailureList();
-        assertThat(resultList.size(), is(maxCount));
+        assertTrue(resultList.size() >= maxCount);
 
         for (int index = 0; index < maxCount; index += 16) {
             assertThat(resultList, hasItem(results[index]));
