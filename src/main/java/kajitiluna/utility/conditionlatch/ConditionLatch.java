@@ -167,6 +167,10 @@ public class ConditionLatch<SUCCESS_RESULT, FAILURE_RESULT> {
      * <li>Some other thread {@linkplain Thread#interrupt interrupts} the current thread.
      * </ul>
      * </p>
+     * <p>
+     * <b>Warning:</b> The contents of the returned list are not guaranteed to be same as when latch is released,
+     * but are guaranteed to contains all contents at the time of released.
+     * </p>
      *
      * @return list of succeed procedure's result
      * @throws SubmittedFailureResultException if the failure count reaches zero before success count does.
@@ -195,6 +199,10 @@ public class ConditionLatch<SUCCESS_RESULT, FAILURE_RESULT> {
      * <li>Some other thread {@linkplain Thread#interrupt interrupts} the current thread.
      * <li>The specified waiting time elapses.
      * </ul>
+     * </p>
+     * <p>
+     * <b>Warning:</b> The contents of the returned list are not guaranteed to be same as when latch is released,
+     * but are guaranteed to contains all contents at the time of released.
      * </p>
      *
      * @param timeout the maximum time to wait
@@ -246,7 +254,9 @@ public class ConditionLatch<SUCCESS_RESULT, FAILURE_RESULT> {
         Lock lock = baseLock.readLock();
         lock.lock();
         try {
-            copyList = Collections.unmodifiableList(new ArrayList<TYPE>(srcList));
+            List<TYPE> tempList = this.createList(1);
+            tempList.addAll(srcList);
+            copyList = Collections.unmodifiableList(tempList);
         } finally {
             lock.unlock();
         }
